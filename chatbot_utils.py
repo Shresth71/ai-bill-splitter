@@ -8,27 +8,26 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 class GeminiExpenseChatbot:
     def __init__(self):
-        self.model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-        self.instruction = """
-        Extract bill details STRICTLY in this JSON format:
-        {
-            "amount": number, 
-            "paid_by": string (default: "You"),
-            "participants": list (including payer),
-            "description": string,
-            "date": string (YYYY-MM-DD, default: today),
-            "category": string (optional, e.g., Food, Travel)
-        }
-        If amount is missing, return {"error": "No amount found"}
-        """
+        self.model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction="""
+            Extract bill details STRICTLY in this JSON format:
+            {
+                "amount": number, 
+                "paid_by": string (default: "You"),
+                "participants": list (including payer),
+                "description": string,
+                "date": string (YYYY-MM-DD, default: today),
+                "category": string (optional, e.g., Food, Travel)
+            }
+            If amount is missing, return {"error": "No amount found"}
+            """
+        )
 
     def process_expense(self, input_text: str):
         """Parse and return structured expense data"""
         try:
-            response = self.model.generate_content([
-                {"role": "system", "parts": [self.instruction]},
-                {"role": "user", "parts": [input_text]}
-            ])
+            response = self.model.generate_content(input_text)
             json_str = response.text.strip().removeprefix("```json").removesuffix("```").strip()
             data = json.loads(json_str)
 
