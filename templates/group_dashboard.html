@@ -1,0 +1,873 @@
+<html lang="en">
+<head>
+    <title>{{ group_name }} - AI Bill Splitter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #F9FAFB, #E3F2FD);
+            min-height: 100vh;
+        }
+        .navbar {
+            background-color: #6C63FF;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            background: #ffffff;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .btn-success, .btn-info {
+            border-radius: 50px;
+            font-weight: 600;
+        }
+        .btn-success {
+            background-color: #FF6584;
+            border: none;
+        }
+        .btn-success:hover {
+            background-color: #ff4c72;
+        }
+        .btn-info {
+            background-color: #6C63FF;
+            border: none;
+        }
+        .btn-info:hover {
+            background-color: #5a54d3;
+        }
+        .btn-upload {
+            background-color: #4e8cff;
+            border: none;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 50px;
+        }
+        .btn-upload:hover {
+            background-color: #3a74d8;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #6C63FF;
+            color: white;
+            border: none;
+            border-radius: 1rem;
+        }
+        .nav-tabs .nav-link {
+            border: none;
+            color: #555;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        h1, h5 {
+            font-weight: 700;
+            color: #333;
+        }
+        .toast-container {
+            z-index: 2000;
+        }
+        .expense-item {
+            border-left: 4px solid #6C63FF;
+            padding-left: 10px;
+            margin-bottom: 15px;
+        }
+        .settlement-item {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .badge-category {
+            background-color: #6C63FF;
+            color: white;
+        }
+        /* Chat message styling */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-message {
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    word-wrap: break-word;
+}
+
+.user-message {
+    align-self: flex-end;
+    background-color: #6C63FF;
+    color: white;
+    border-bottom-right-radius: 5px;
+}
+
+.bot-message {
+    align-self: flex-start;
+    background-color: #f1f1f1;
+    color: #333;
+    border-bottom-left-radius: 5px;
+}
+
+.error-message {
+    background-color: #ff6b6b;
+    color: white;
+}
+
+#loading-indicator {
+    align-self: flex-start;
+}
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand text-white fw-bold" href="{{ url_for('home') }}">AI Bill Splitter</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast Notifications -->
+    <div aria-live="polite" aria-atomic="true" class="position-relative">
+      <div class="toast-container position-fixed top-0 end-0 p-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="toast align-items-center text-white bg-{{ 'success' if category == 'success' else 'danger' }} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                  <div class="toast-body">
+                    {{ message }}
+                  </div>
+                  <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- Page Content -->
+    <div class="container mt-5">
+        <div class="row mb-4 align-items-center">
+            <div class="col">
+                <h1>{{ group_name }}</h1>
+                <p class="text-muted">Group ID: {{ group_id }}</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+                    <i class="fas fa-plus"></i> Add Expense
+                </button>
+                <button class="btn btn-info ms-2" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                    <i class="fas fa-user-plus"></i> Add User
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs" id="groupTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" 
+                    type="button" role="tab" aria-selected="true">Dashboard</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="expenses-tab" data-bs-toggle="tab" data-bs-target="#expenses" 
+                    type="button" role="tab" aria-selected="false">All Expenses</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="settlements-tab" data-bs-toggle="tab" data-bs-target="#settlements" 
+                    type="button" role="tab" aria-selected="false">Settlements</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="myexpenses-tab" data-bs-toggle="tab" data-bs-target="#myexpenses" 
+                    type="button" role="tab" aria-selected="false">My Expenses</button>
+            </li>
+            <!-- In the tabs navigation, replace the upload tab with: -->
+<li class="nav-item" role="presentation">
+    <button class="nav-link" id="chatbot-tab" data-bs-toggle="tab" data-bs-target="#chatbot" 
+        type="button" role="tab" aria-selected="false">AI Assistant</button>
+</li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content mt-4" id="groupTabContent">
+            <!-- Dashboard Tab -->
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                <div class="card p-4">
+                    <h5 class="mb-4">Group Summary</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h6 class="card-title">Total Expenses</h6>
+                                    <h4 class="card-text">
+                                        ₹{{ "%.2f"|format(expense_summary.total_amount) if expense_summary.total_amount else "0.00" }}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h6 class="card-title">Your Net Balance</h6>
+                                    <h4 class="card-text">
+                                        {% if user_info.net_balance > 0 %}
+                                            <span class="text-success">₹{{ "%.2f"|format(user_info.net_balance) }}</span> (You are owed)
+                                        {% elif user_info.net_balance < 0 %}
+                                            <span class="text-danger">₹{{ "%.2f"|format(-user_info.net_balance) }}</span> (You owe)
+                                        {% else %}
+                                            <span class="text-muted">₹0.00</span> (Even)
+                                        {% endif %}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-4 mb-3">Expenses by Category</h6>
+                    <div class="row">
+                        {% for category, amount in expense_summary.categories.items() %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <span>{{ category }}</span>
+                                        <span>₹{{ "%.2f"|format(amount) }}</span>
+                                    </div>
+                                    <div class="progress mt-2" style="height: 8px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ (amount/expense_summary.total_amount)*100 }}%; background-color: #6C63FF;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Expenses Tab -->
+            <div class="tab-pane fade" id="expenses" role="tabpanel">
+                <div class="card p-4">
+                    <h5 class="mb-4">All Expenses</h5>
+                    {% if expenses %}
+                        {% for expense in expenses %}
+                        <div class="expense-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6>{{ expense.description }}</h6>
+                                    <small class="text-muted">
+                                        Paid by {{ expense.paid_by }} on {{ expense.date }}
+                                        {% if expense.category %}
+                                            <span class="badge badge-category ms-2">{{ expense.category }}</span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <h5>₹{{ "%.2f"|format(expense.amount) }}</h5>
+                                    <small>Split between {{ expense.participants|length }} people</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                            <p>No expenses recorded yet</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Settlements Tab -->
+            <div class="tab-pane fade" id="settlements" role="tabpanel">
+                <div class="card p-4">
+                    <h5 class="mb-4">Settlements</h5>
+                    {% if settlements %}
+                        <div class="alert alert-info">
+                            To settle all balances, these transactions need to happen:
+                        </div>
+                        {% for settlement in settlements %}
+                        <div class="settlement-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ settlement['from'] }}</strong> pays 
+                                    <strong>{{ settlement['to'] }}</strong>
+                                </div>
+                                <div class="text-end">
+                                    <h5 class="mb-0">₹{{ "%.2f"|format(settlement['amount']) }}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <p>No settlements needed. Everyone is even!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- My Expenses Tab -->
+            <div class="tab-pane fade" id="myexpenses" role="tabpanel">
+                <div class="card p-4">
+                    <h5 class="mb-4">My Expense Summary</h5>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Total Paid</h6>
+                                    <h4 class="card-text text-success">₹{{ "%.2f"|format(user_info.total_paid) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Total Owed</h6>
+                                    <h4 class="card-text text-danger">₹{{ "%.2f"|format(user_info.total_owed) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Net Balance</h6>
+                                    <h4 class="card-text">
+                                        {% if user_info.net_balance > 0 %}
+                                            <span class="text-success">₹{{ "%.2f"|format(user_info.net_balance) }}</span>
+                                        {% elif user_info.net_balance < 0 %}
+                                            <span class="text-danger">₹{{ "%.2f"|format(-user_info.net_balance) }}</span>
+                                        {% else %}
+                                            <span class="text-muted">₹0.00</span>
+                                        {% endif %}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-4 mb-3">Expenses You Paid</h6>
+                    {% if user_info.paid_expenses %}
+                        {% for expense in user_info.paid_expenses %}
+                        <div class="expense-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6>{{ expense.description }}</h6>
+                                    <small class="text-muted">
+                                        {{ expense.date }}
+                                        {% if expense.category %}
+                                            <span class="badge badge-category ms-2">{{ expense.category }}</span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <h5>₹{{ "%.2f"|format(expense.amount) }}</h5>
+                                    <small>Split between {{ expense.participants|length }} people</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                            <p>You haven't paid for any expenses yet</p>
+                        </div>
+                    {% endif %}
+                    
+                    <h6 class="mt-4 mb-3">Expenses You Owe</h6>
+                    {% if user_info.participating_expenses %}
+                        {% for expense in user_info.participating_expenses %}
+                            {% if expense.paid_by != session['username'] %}
+                            <div class="expense-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6>{{ expense.description }}</h6>
+                                        <small class="text-muted">
+                                            Paid by {{ expense.paid_by }} on {{ expense.date }}
+                                            {% if expense.category %}
+                                                <span class="badge badge-category ms-2">{{ expense.category }}</span>
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        <h5>₹{{ "%.2f"|format(expense.amount/expense.participants|length) }}</h5>
+                                        <small>Your share of ₹{{ "%.2f"|format(expense.amount) }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <p>You don't owe anyone anything!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+<!-- Chatbot Tab -->
+<div class="tab-pane fade" id="chatbot" role="tabpanel">
+    <div class="card p-4">
+        <h5 class="mb-4">AI Expense Assistant</h5>
+        <div class="chat-container" style="height: 400px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; padding: 15px; background-color: #f8f9fa;">
+            <div id="chat-messages">
+                <!-- Initial welcome message -->
+                <div class="mb-3 p-3 rounded bg-light">
+                    <strong>AI Assistant:</strong> Hi! I can help you add expenses quickly. Try something like:<br>
+                    <em>"I paid ₹1200 for dinner with Alice and Bob"</em> or<br>
+                    <em>"What's my current balance?"</em>
+                </div>
+            </div>
+        </div>
+        <form id="chatbot-form">
+            <div class="input-group">
+                <input type="text" id="chatbot-input" class="form-control" placeholder="Type your expense message here..." autocomplete="off">
+                <button class="btn btn-info" type="submit" id="chatbot-send">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+            <small class="text-muted mt-2 d-block">Examples: "Paid ₹500 for taxi with Alice", "What do I owe?"</small>
+        </form>
+    </div>
+</div>
+<script>
+    const group_id = "{{ group_id }}";
+  </script>
+  
+<script>
+    
+document.addEventListener('DOMContentLoaded', function() {
+    const chatForm = document.getElementById('chatbot-form');
+    const chatInput = document.getElementById('chatbot-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const sendButton = document.getElementById('chatbot-send');
+    
+    function addMessage(text, sender, isError = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `mb-3 p-3 rounded ${sender === 'user' ? 'bg-primary text-white ms-5' : 'bg-light me-5'} ${isError ? 'bg-danger text-white' : ''}`;
+        
+        const senderLabel = document.createElement('strong');
+        senderLabel.textContent = sender === 'user' ? 'You:' : 'AI Assistant:';
+        messageDiv.appendChild(senderLabel);
+        
+        messageDiv.appendChild(document.createElement('br'));
+        
+        const textNode = document.createTextNode(text);
+        messageDiv.appendChild(textNode);
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading-indicator';
+        loadingDiv.className = 'mb-3 p-2 rounded bg-light me-5 text-center';
+        loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking...';
+        chatMessages.appendChild(loadingDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return loadingDiv;
+    }
+    
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading-indicator');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+    
+    function updateExpensesTab(newExpense) {
+        const expensesTab = document.querySelector('#expenses .card');
+        const noExpensesDiv = expensesTab.querySelector('.text-center');
+        
+        if (noExpensesDiv) {
+            noExpensesDiv.remove();
+        }
+        
+        const expenseItem = document.createElement('div');
+        expenseItem.className = 'expense-item mb-3';
+        expenseItem.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6>${newExpense.description}</h6>
+                    <small class="text-muted">
+                        Paid by ${newExpense.paid_by} on ${newExpense.date}
+                        ${newExpense.category ? `<span class="badge badge-category ms-2">${newExpense.category}</span>` : ''}
+                    </small>
+                </div>
+                <div class="text-end">
+                    <h5>₹${parseFloat(newExpense.amount).toFixed(2)}</h5>
+                    <small>Split between ${newExpense.participants.length} people</small>
+                </div>
+            </div>
+        `;
+        
+        expensesTab.insertBefore(expenseItem, expensesTab.firstChild);
+    }
+    
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        addMessage(message, 'user');
+        chatInput.value = '';
+        
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+        
+        const loadingDiv = showLoading();
+        
+        fetch(`/group/${group_id}/chatbot`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: message })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            hideLoading();
+            
+            if (data.status === 'success') {
+                addMessage(data.message, 'bot');
+                
+                if (data.data_type === 'expense' && data.expense) {
+                    updateExpensesTab(data.expense);
+                    
+                    // Update the dashboard summary after a short delay
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                }
+                
+                if (data.data_type === 'balance') {
+                    if (data.settlements && data.settlements.length > 0) {
+                        let balanceMessage = "Here's the current balance situation:\n";
+                        data.settlements.forEach(settlement => {
+                            balanceMessage += `- ${settlement.from} owes ${settlement.to} ₹${parseFloat(settlement.amount).toFixed(2)}\n`;
+                        });
+                        addMessage(balanceMessage, 'bot');
+                    } else {
+                        addMessage("Everyone is settled up with no outstanding balances!", 'bot');
+                    }
+                }
+                
+            } else {
+                addMessage(data.message || 'Sorry, something went wrong.', 'bot', true);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            addMessage('Sorry, something went wrong. Please try again.', 'bot', true);
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            chatInput.disabled = false;
+            sendButton.disabled = false;
+            chatInput.focus();
+        });
+    });
+    
+    document.getElementById('chatbot-tab').addEventListener('shown.bs.tab', function() {
+        chatInput.focus();
+    });
+});
+</script>
+<!-- Add this script at the bottom of the file, after the existing scripts -->
+
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('add_user_to_group', group_id=group_id) }}">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" id="username" required placeholder="Enter username">
+                <small class="text-muted">User must already have an account on the system</small>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="submit" class="btn btn-success">Add User</button>
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div class="modal fade" id="addExpenseModal" tabindex="-1" aria-labelledby="addExpenseModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('add_expense', group_id=group_id) }}">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="addExpenseModalLabel">Add New Expense</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <input type="text" name="description" class="form-control" id="description" required placeholder="e.g., Dinner, Cab Fare">
+              </div>
+
+              <div class="mb-3">
+                <label for="amount" class="form-label">Amount</label>
+                <input type="number" name="amount" class="form-control" id="amount" step="0.01" min="0.01" required placeholder="e.g., 250.00">
+              </div>
+
+              <div class="mb-3">
+                <label for="paid_by" class="form-label">Paid By</label>
+                <select name="paid_by" class="form-select" id="paid_by" required>
+                  {% for user in group_users %}
+                    <option value="{{ user }}" {% if user == session['username'] %}selected{% endif %}>{{ user }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label for="participants" class="form-label">Participants</label>
+                <select name="participants" class="form-select" id="participants" multiple required>
+                  {% for user in group_users %}
+                    <option value="{{ user }}" selected>{{ user }}</option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Hold CTRL (or CMD) to select/deselect multiple users</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="category" class="form-label">Category (optional)</label>
+                <input type="text" name="category" class="form-control" id="category" placeholder="e.g., Food, Travel, Utilities">
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="submit" class="btn btn-success">Add Expense</button>
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Script to auto-show toasts -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var toastElList = [].slice.call(document.querySelectorAll('.toast'))
+      var toastList = toastElList.map(function (toastEl) {
+        var option = {
+          delay: 3000
+        };
+        var myToast = new bootstrap.Toast(toastEl, option);
+        myToast.show();
+      });
+    });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatForm = document.getElementById('chatbot-form');
+            const chatInput = document.getElementById('chatbot-input');
+            const chatMessages = document.getElementById('chat-messages');
+            
+            chatForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const message = chatInput.value.trim();
+                if (!message) return;
+                
+                // Add user message to chat
+                addMessage(message, 'user');
+                chatInput.value = '';
+                
+                // Send to server
+                fetch(`/group/${group_id}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addMessage(data.message, 'bot');
+                        // Reload the page to show new expense
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        addMessage(data.message, 'bot', true);
+                    }
+                })
+                .catch(error => {
+                    addMessage('Sorry, something went wrong. Please try again.', 'bot', true);
+                });
+            });
+            
+            function addMessage(text, sender, isError = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `mb-2 p-3 rounded ${sender === 'user' ? 'bg-light text-end ms-5' : 'bg-primary text-white me-5'} ${isError ? 'bg-danger' : ''}`;
+                messageDiv.innerHTML = text;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        });
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const chatForm = document.getElementById('chatbot-form');
+                const chatInput = document.getElementById('chatbot-input');
+                const chatMessages = document.getElementById('chat-messages');
+                const sendButton = document.getElementById('chatbot-send');
+                
+                // Function to add a message to the chat
+                function addMessage(text, sender, isError = false) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `mb-3 p-3 rounded ${sender === 'user' ? 'bg-primary text-white ms-5' : 'bg-light me-5'} ${isError ? 'bg-danger text-white' : ''}`;
+                    
+                    // Add sender label
+                    const senderLabel = document.createElement('strong');
+                    senderLabel.textContent = sender === 'user' ? 'You:' : 'AI Assistant:';
+                    messageDiv.appendChild(senderLabel);
+                    
+                    // Add line break
+                    messageDiv.appendChild(document.createElement('br'));
+                    
+                    // Add message text
+                    const textNode = document.createTextNode(text);
+                    messageDiv.appendChild(textNode);
+                    
+                    chatMessages.appendChild(messageDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+                
+                // Function to show a loading indicator
+                function showLoading() {
+                    const loadingDiv = document.createElement('div');
+                    loadingDiv.id = 'loading-indicator';
+                    loadingDiv.className = 'mb-3 p-2 rounded bg-light me-5 text-center';
+                    loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking...';
+                    chatMessages.appendChild(loadingDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    return loadingDiv;
+                }
+                
+                // Function to hide loading indicator
+                function hideLoading() {
+                    const loadingDiv = document.getElementById('loading-indicator');
+                    if (loadingDiv) {
+                        loadingDiv.remove();
+                    }
+                }
+                
+                // Handle form submission
+                chatForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const message = chatInput.value.trim();
+                    if (!message) return;
+                    
+                    // Add user message to chat
+                    addMessage(message, 'user');
+                    chatInput.value = '';
+                    
+                    // Disable input and button while processing
+                    chatInput.disabled = true;
+                    sendButton.disabled = true;
+                    
+                    // Show loading indicator
+                    const loadingDiv = showLoading();
+                    
+                    // Send to server
+                    fetch(`/group/${group_id}/chatbot`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: message })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        hideLoading();
+                        
+                        if (data.status === 'success') {
+                            addMessage(data.message, 'bot');
+                            
+                            // If an expense was added, reload the page after a short delay
+                            if (data.data_type === 'expense') {
+                                setTimeout(() => {
+                                    location.reload();
+                                }, 2000);
+                            }
+                            
+                            // Handle balance responses
+                            if (data.data_type === 'balance') {
+                                if (data.settlements && data.settlements.length > 0) {
+                                    let balanceMessage = "Here's the current balance situation:\n";
+                                    data.settlements.forEach(settlement => {
+                                        balanceMessage += `- ${settlement.from} owes ${settlement.to} ₹${settlement.amount.toFixed(2)}\n`;
+                                    });
+                                    addMessage(balanceMessage, 'bot');
+                                } else {
+                                    addMessage("Everyone is settled up with no outstanding balances!", 'bot');
+                                }
+                            }
+                            
+                        } else {
+                            addMessage(data.message || 'Sorry, something went wrong.', 'bot', true);
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        addMessage('Sorry, something went wrong. Please try again.', 'bot', true);
+                        console.error('Error:', error);
+                    })
+                    .finally(() => {
+                        chatInput.disabled = false;
+                        sendButton.disabled = false;
+                        chatInput.focus();
+                    });
+                });
+                
+                // Focus the input field when the tab is shown
+                document.getElementById('chatbot-tab').addEventListener('shown.bs.tab', function() {
+                    chatInput.focus();
+                });
+            });
+        </script>
+</body>
+</html>

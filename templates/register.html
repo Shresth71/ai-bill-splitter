@@ -1,6 +1,6 @@
 <html lang="en">
 <head>
-    <title>Login - AI Bill Splitter</title>
+    <title>Register - AI Bill Splitter</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -40,9 +40,9 @@
     </style>
 </head>
 <body>
-    <div class="card p-4" style="width: 400px;">
+    <div class="card p-4" style="width: 450px;">
         <div class="card-header bg-white border-0 text-center">
-            <h3 class="fw-bold" style="color:#333;">Login</h3>
+            <h3 class="fw-bold" style="color:#333;">Register</h3>
         </div>
         <div class="card-body">
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -59,16 +59,20 @@
                     <input type="text" class="form-control" id="username" name="username" required>
                 </div>
                 <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" name="email" required>
+                </div>
+                <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
                     <input type="password" class="form-control" id="password" name="password" required>
                 </div>
                 <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">Login</button>
+                    <button type="submit" class="btn btn-primary btn-lg">Register</button>
                 </div>
             </form>
 
             <div class="text-center mt-3">
-                <p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
+                <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
             </div>
         </div>
     </div>
